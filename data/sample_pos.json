@@ -1,0 +1,57 @@
+[
+  {
+    "po_number": "4500123401",
+    "sap_code": "MM-INS-1101",
+    "material_name": "11 kV Pin Insulator (porcelain)",
+    "material_category": "insulator",
+    "manufacturer": "Deccan Ceramics Pvt Ltd",
+    "manufacturer_aliases": ["Deccan Ceramics", "DECCAN", "DCPL"],
+    "quantity": 500,
+    "unit": "EA",
+    "store": "Uppal Central Store",
+    "standard": "IS 731 / IEC 60383",
+    "voltage_kv": 11,
+    "specs": {
+      "creepage_mm": {"nominal": 320.0, "tol": 8.0},
+      "height_mm": {"nominal": 150.0, "tol": 5.0},
+      "diameter_mm": {"nominal": 100.0, "tol": 4.0}
+    },
+    "pilot_enabled": true
+  },
+  {
+    "po_number": "4500123410",
+    "sap_code": "MM-INS-3303",
+    "material_name": "33 kV Suspension Insulator Disc (porcelain)",
+    "material_category": "insulator",
+    "manufacturer": "Godavari Insulators Ltd",
+    "manufacturer_aliases": ["Godavari Insulators", "GIL", "GODAVARI"],
+    "quantity": 200,
+    "unit": "EA",
+    "store": "Warangal Central Store",
+    "standard": "IS 731 / ANSI C29",
+    "voltage_kv": 33,
+    "specs": {
+      "creepage_mm": {"nominal": 380.0, "tol": 10.0},
+      "height_mm": {"nominal": 146.0, "tol": 5.0},
+      "diameter_mm": {"nominal": 254.0, "tol": 6.0}
+    },
+    "pilot_enabled": true
+  },
+  {
+    "po_number": "4500123402",
+    "sap_code": "MM-CND-0210",
+    "material_name": "ACSR Dog Conductor (per drum)",
+    "material_category": "cable",
+    "manufacturer": "Godavari Conductors",
+    "manufacturer_aliases": ["Godavari Conductors"],
+    "quantity": 12,
+    "unit": "DRM",
+    "store": "Warangal Central Store",
+    "standard": "IS 398",
+    "voltage_kv": null,
+    "specs": {
+      "diameter_mm": {"nominal": 14.15, "tol": 0.28}
+    },
+    "pilot_enabled": false
+  }
+]

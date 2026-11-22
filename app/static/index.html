@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Material Inspector</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Source+Serif+4:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">AI Material Inspector</p>
+        <h1>Insulator receipt QC</h1>
+      </div>
+      <div class="topbar-right">
+        <div id="userChip" class="user-chip">…</div>
+        <button id="logoutBtn" type="button" class="ghost">Sign out</button>
+      </div>
+    </header>
+
+    <p class="banner">Pilot SKU: porcelain electrical insulators. CV uses OpenCV heuristics (not a trained YOLO). Dimensions are officer-entered; mm-accurate auto-measure needs a reference marker.</p>
+    <section class="kpis" id="kpis"></section>
+
+    <section class="layout">
+      <div class="panel">
+        <h2>New inspection</h2>
+        <label for="poSelect">SAP purchase order</label>
+        <select id="poSelect"></select>
+        <div id="poMeta" class="hint"></div>
+
+        <div class="row">
+          <div>
+            <label for="creepage">Creepage (mm)</label>
+            <input id="creepage" type="number" step="0.1" placeholder="e.g. 318.6" />
+          </div>
+          <div>
+            <label for="height">Height (mm)</label>
+            <input id="height" type="number" step="0.1" placeholder="e.g. 150" />
+          </div>
+          <div>
+            <label for="diameter">Diameter (mm)</label>
+            <input id="diameter" type="number" step="0.1" placeholder="e.g. 100" />
+          </div>
+        </div>
+
+        <label for="files">Photos (front / side / label / defect close-up)</label>
+        <input id="files" type="file" accept="image/*" capture="environment" multiple />
+        <div class="drop">Upload at least 2 photos. Use the camera on a phone or tablet.</div>
+        <div id="previews" class="previews"></div>
+
+        <div class="actions">
+          <button id="runBtn" type="button">Run AI inspection</button>
+          <button id="samplePassBtn" type="button" class="ghost">Fill PASS sample</button>
+          <button id="sampleFailBtn" type="button" class="ghost">Fill FAIL sample</button>
+        </div>
+        <p id="formError" class="error" hidden></p>
+      </div>
+
+      <aside class="panel" id="resultPanel">
+        <h2>Inspection result</h2>
+        <p class="hint">Run an inspection to see AI decision, checks, OCR, and annotated evidence.</p>
+      </aside>
+    </section>
+
+    <section class="panel" style="margin-top:1rem">
+      <h2>Recent inspections</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>PO</th><th>Material</th><th>AI</th><th>Approval</th><th>When</th></tr>
+          </thead>
+          <tbody id="historyTable"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: ai-material-inspector
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:////app/data/processed/material_inspector.db
+      - key: DEFAULT_ADMIN_EMAIL
+        value: officer@tgspdcl.example
+      - key: DEFAULT_ADMIN_PASSWORD
+        value: ChangeMeNow!23
+      - key: ALLOW_DEMO_LOGIN
+        value: "true"
+      - key: CORS_ORIGINS
+        value: https://tisc-telangana-solutions.onrender.com,http://localhost:8080
