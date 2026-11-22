@@ -28,7 +28,19 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    import threading
+
     init_database()
+
+    def _warm() -> None:
+        try:
+            from app.services.ocr import warm_ocr
+
+            warm_ocr()
+        except Exception:  # noqa: BLE001
+            pass
+
+    threading.Thread(target=_warm, name="ocr-warm", daemon=True).start()
     yield
 
 

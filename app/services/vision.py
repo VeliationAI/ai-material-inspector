@@ -9,6 +9,8 @@ from typing import Any
 import cv2
 import numpy as np
 
+_MAX_SIDE = 640
+
 
 @dataclass
 class DefectBox:
@@ -20,6 +22,14 @@ class DefectBox:
     h: int
 
 
+def _resize(raw: np.ndarray) -> tuple[np.ndarray, float]:
+    h, w = raw.shape[:2]
+    scale = min(1.0, _MAX_SIDE / max(h, w))
+    if scale < 1.0:
+        raw = cv2.resize(raw, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+    return raw, scale
+
+
 def _crack_candidates(gray: np.ndarray) -> list[DefectBox]:
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
     edges = cv2.Canny(blur, 60, 150)
@@ -28,7 +38,7 @@ def _crack_candidates(gray: np.ndarray) -> list[DefectBox]:
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     boxes: list[DefectBox] = []
     h, w = gray.shape[:2]
-    min_area = max(80, int(0.0004 * h * w))
+    min_area = max(60, int(0.0004 * h * w))
     for cnt in contours:
         area = cv2.contourArea(cnt)
         if area < min_area:
@@ -36,22 +46,19 @@ def _crack_candidates(gray: np.ndarray) -> list[DefectBox]:
         x, y, bw, bh = cv2.boundingRect(cnt)
         aspect = max(bw, bh) / max(1, min(bw, bh))
         extent = area / max(1, bw * bh)
-        # Long thin anomalies resemble cracks / chips on porcelain
         if aspect >= 3.2 and extent < 0.45:
             conf = min(0.95, 0.45 + min(aspect, 12) / 20 + min(area, 5000) / 12000)
             boxes.append(DefectBox("crack", round(float(conf), 3), int(x), int(y), int(bw), int(bh)))
         elif aspect < 2.0 and 0.15 < extent < 0.7 and area > min_area * 2:
-            # Compact bright/edge blobs → chip / surface damage candidates
             conf = min(0.9, 0.4 + area / 8000)
             boxes.append(DefectBox("chip", round(float(conf), 3), int(x), int(y), int(bw), int(bh)))
     boxes.sort(key=lambda b: b.confidence, reverse=True)
-    return boxes[:8]
+    return boxes[:6]
 
 
 def _surface_damage_score(gray: np.ndarray) -> float:
     lap = cv2.Laplacian(gray, cv2.CV_64F)
     variance = float(lap.var())
-    # High local variance under typical warehouse lighting can indicate damage texture
     if variance > 420:
         return min(0.92, (variance - 420) / 800)
     return 0.0
@@ -69,6 +76,7 @@ def analyze_image(image_path: Path, annotated_path: Path) -> dict[str, Any]:
             "annotated_path": None,
         }
 
+    raw, _ = _resize(raw)
     gray = cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY)
     defects = _crack_candidates(gray)
     surface = _surface_damage_score(gray)
@@ -78,7 +86,7 @@ def analyze_image(image_path: Path, annotated_path: Path) -> dict[str, Any]:
             DefectBox("surface_damage", round(surface, 3), int(w * 0.2), int(h * 0.2), int(w * 0.6), int(h * 0.6))
         )
 
-    annotated = raw.copy()
+    annotated = raw
     colors = {
         "crack": (40, 40, 220),
         "chip": (0, 140, 255),
@@ -99,7 +107,7 @@ def analyze_image(image_path: Path, annotated_path: Path) -> dict[str, Any]:
         )
 
     annotated_path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(annotated_path), annotated)
+    cv2.imwrite(str(annotated_path), annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 72])
 
     return {
         "ok": True,

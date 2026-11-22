@@ -166,13 +166,15 @@ async function runInspection(kind = null) {
 
   const btn = document.getElementById("runBtn");
   btn.disabled = true;
+  const started = performance.now();
   btn.textContent = "Inspecting…";
   try {
     const res = await api("/api/v1/inspections", { method: "POST", body: fd });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Inspection failed");
+    data._client_ms = Math.round(performance.now() - started);
     renderResult(data);
-    await loadHistory();
+    loadHistory();
   } catch (e) {
     err.textContent = e.message || String(e);
     err.hidden = false;
@@ -191,10 +193,12 @@ function renderResult(data) {
       (f) => `<tr><td>${f.check_name}</td><td>${f.result}</td><td>${f.detail}</td></tr>`
     )
     .join("");
+  const ms = data.summary?.pipeline_ms || data._client_ms;
   panel.innerHTML = `
     <h2>Inspection #${data.id}</h2>
     <p><span class="decision ${data.ai_decision}">${data.ai_decision}</span>
-       · approval: <strong>${data.approval_status}</strong></p>
+       · approval: <strong>${data.approval_status}</strong>
+       ${ms ? `· ${ms} ms` : ""}</p>
     <p>${data.narrative}</p>
     <table><thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead><tbody>${checks}</tbody></table>
     <div class="evidence" id="evidenceBox"></div>
@@ -217,7 +221,8 @@ function renderResult(data) {
     a.click();
   };
   const box = document.getElementById("evidenceBox");
-  (data.images || []).forEach(async (img) => {
+  // Load at most 2 annotated previews so the UI stays snappy.
+  (data.images || []).slice(0, 2).forEach(async (img) => {
     const path = img.annotated_path || img.path;
     const res = await api(path);
     if (!res.ok) return;

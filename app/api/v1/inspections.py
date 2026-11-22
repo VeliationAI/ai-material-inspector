@@ -59,7 +59,7 @@ def _serialize(insp: Inspection) -> InspectionOut:
             )
             for img in insp.images
         ],
-        report_available=bool(insp.report_path),
+        report_available=insp.ai_decision != Decision.pending,
         created_at=insp.created_at,
     )
 
@@ -189,11 +189,43 @@ def approve_inspection(
 
 @router.get("/{inspection_id}/report")
 def download_report(inspection_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from app.services.pipeline import po_to_dict
+    from app.services.report_pdf import build_report
+    from app.services.rules import decision_label
+
     insp = _load(db, user, inspection_id)
-    if not insp.report_path or not Path(insp.report_path).exists():
-        raise HTTPException(404, "Report not available")
+    settings = get_settings()
+    report_path = Path(insp.report_path) if insp.report_path else settings.reports_dir / f"inspection_{insp.id}.pdf"
+    if not report_path.exists():
+        summary = json.loads(insp.summary_json or "{}")
+        build_report(
+            report_path,
+            {
+                "decision_label": decision_label(insp.ai_decision),
+                "narrative": insp.narrative,
+                "purchase_order": po_to_dict(insp.purchase_order),
+                "checks": summary.get("checks")
+                or [
+                    {
+                        "check_name": f.check_name,
+                        "result": f.result,
+                        "detail": f.detail,
+                    }
+                    for f in insp.findings
+                ],
+                "measured": {
+                    "creepage_mm": insp.measured_creepage_mm,
+                    "height_mm": insp.measured_height_mm,
+                    "diameter_mm": insp.measured_diameter_mm,
+                },
+                # Skip image embeds for speed; evidence stays in the web UI.
+                "annotated_images": [],
+            },
+        )
+        insp.report_path = str(report_path)
+        db.commit()
     return FileResponse(
-        insp.report_path,
+        str(report_path),
         media_type="application/pdf",
         filename=f"inspection_{inspection_id}.pdf",
     )

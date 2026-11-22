@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -14,7 +16,8 @@ from app.db.models import Finding, Inspection, InspectionImage, PurchaseOrder
 from app.services import ocr as ocr_svc
 from app.services import rules
 from app.services import vision
-from app.services.report_pdf import build_report
+
+logger = logging.getLogger(__name__)
 
 
 def po_to_dict(po: PurchaseOrder) -> dict[str, Any]:
@@ -36,11 +39,19 @@ def po_to_dict(po: PurchaseOrder) -> dict[str, Any]:
     }
 
 
+def _pick_ocr_image(images: list[InspectionImage]) -> InspectionImage | None:
+    if not images:
+        return None
+    for img in images:
+        if "label" in (img.angle or "").lower():
+            return img
+    return images[0]
+
+
 def run_pipeline(db: Session, inspection: Inspection, po: PurchaseOrder) -> Inspection:
     settings = get_settings()
+    started = time.perf_counter()
     all_defects: list[dict[str, Any]] = []
-    ocr_texts: list[str] = []
-    ocr_parsed: dict[str, Any] = {}
     annotated_paths: list[str] = []
 
     for image in inspection.images:
@@ -52,18 +63,17 @@ def run_pipeline(db: Session, inspection: Inspection, po: PurchaseOrder) -> Insp
             annotated_paths.append(vision_result["annotated_path"])
         all_defects.extend(vision_result.get("defects") or [])
 
-        ocr_result = ocr_svc.extract_text(src)
-        image.ocr_text = ocr_result.get("raw_text") or ""
-        if image.ocr_text:
-            ocr_texts.append(image.ocr_text)
-        for key, value in (ocr_result.get("parsed") or {}).items():
-            if value and not ocr_parsed.get(key):
-                ocr_parsed[key] = value
+    # OCR only one image (prefer label) — biggest latency win on free CPU.
+    ocr_image = _pick_ocr_image(list(inspection.images))
+    ocr_result: dict[str, Any] = {"raw_text": "", "parsed": {}, "engine": "skipped"}
+    if ocr_image is not None:
+        ocr_result = ocr_svc.extract_text(Path(ocr_image.path))
+        ocr_image.ocr_text = ocr_result.get("raw_text") or ""
 
     combined_ocr = {
-        "raw_text": "\n".join(ocr_texts),
-        "parsed": ocr_parsed,
-        "engine": "rapidocr" if ocr_texts else "unavailable",
+        "raw_text": ocr_result.get("raw_text") or "",
+        "parsed": ocr_result.get("parsed") or {},
+        "engine": ocr_result.get("engine") or "unavailable",
     }
     measured = {
         "creepage_mm": inspection.measured_creepage_mm,
@@ -100,22 +110,19 @@ def run_pipeline(db: Session, inspection: Inspection, po: PurchaseOrder) -> Insp
         "ocr_parsed": evaluation["ocr_parsed"],
         "manufacturer_match": evaluation["manufacturer_match"],
         "defects": all_defects,
+        "annotated_images": annotated_paths,
+        "checks": evaluation["checks"],
+        "pipeline_ms": round((time.perf_counter() - started) * 1000, 1),
     }
     inspection.summary_json = json.dumps(summary)
-
-    report_path = settings.reports_dir / f"inspection_{inspection.id}.pdf"
-    build_report(
-        report_path,
-        {
-            "decision_label": summary["decision"],
-            "narrative": inspection.narrative,
-            "purchase_order": po_to_dict(po),
-            "checks": evaluation["checks"],
-            "measured": measured,
-            "annotated_images": annotated_paths,
-        },
-    )
-    inspection.report_path = str(report_path)
+    # PDF is generated lazily on download — keeps inspect API responsive.
+    inspection.report_path = None
     db.add(inspection)
     db.flush()
+    logger.info(
+        "inspection %s pipeline done in %.0fms decision=%s",
+        inspection.id,
+        summary["pipeline_ms"],
+        summary["decision"],
+    )
     return inspection
